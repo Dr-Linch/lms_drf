@@ -3,7 +3,6 @@ from django.db import models
 from lms_app.models import NULLABLE
 
 
-# Create your models here.
 class User(AbstractUser):
     username = None
     email = models.EmailField(unique=True, verbose_name='Почта')
