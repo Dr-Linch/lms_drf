@@ -5,6 +5,7 @@ from lms_app.serializers import CourseSerializer, LessonSerializer, SubscribeSer
 from lms_app.permissions import Author, Moderator
 from rest_framework.permissions import IsAuthenticated
 from lms_app.paginators import CoursesPaginator, LessonsPaginator
+from lms_app.tasks import send_updates
 
 
 # Create your views here.
@@ -16,6 +17,7 @@ class CourseViewSet(ModelViewSet):
     # permission_classes = (IsAuthenticated,)
 
     def get_permissions(self):
+        permission_classes = (IsAuthenticated, Author)
         if self.action == 'create':
             permission_classes = (IsAuthenticated, ~Moderator)
         elif self.action == 'list' or self.action == 'retrieve':
@@ -29,6 +31,10 @@ class CourseViewSet(ModelViewSet):
         new_course.author = self.request.user
         new_course.save()
 
+    def perform_update(self, serializer):
+        course = serializer.save()
+        send_updates.delay(course.pk)
+
 
 class LessonCreateView(CreateAPIView):
     """Создание урока"""
@@ -40,6 +46,7 @@ class LessonCreateView(CreateAPIView):
         new_lesson = serializer.save()
         new_lesson.author = self.request.user
         new_lesson.save()
+        send_updates.delay(new_lesson.course.pk)
 
 
 class LessonListView(ListAPIView):
@@ -62,6 +69,10 @@ class LessonUpdateView(UpdateAPIView):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
     permission_classes = (IsAuthenticated, Author | Moderator,)
+
+    def perform_update(self, serializer):
+        lesson = serializer.save()
+        send_updates.delay(lesson.course.pk)
 
 
 class LessonDestroyView(DestroyAPIView):
